@@ -100,32 +100,18 @@ def main():
     var hit_g_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var hit_b_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
 
-    with dir_x_buffer.map_to_host() as host_buffer:
-        for y in range(height):
-            for x in range(width):
-                px = Float32(x - width / 2) / width * viewport
-                py = Float32(-(y - height / 2) / height * viewport)
-                direction = norm(Vec3(px, py, Float32(projection_plane_z)))
-                index = y*width + x
-                host_buffer[index] = direction.x
-
-    with dir_y_buffer.map_to_host() as host_buffer:
-       for y in range(height):
-           for x in range(width):
-               px = Float32(x - width / 2) / width * viewport
-               py = Float32(-(y - height / 2) / height * viewport)
-               direction = norm(Vec3(px, py, Float32(projection_plane_z)))
-               index = y*width + x
-               host_buffer[index] = direction.y
-
-    with dir_z_buffer.map_to_host() as host_buffer:
-       for y in range(height):
-           for x in range(width):
-               px = Float32(x - width / 2) / width * viewport
-               py = Float32(-(y - height / 2) / height * viewport)
-               direction = norm(Vec3(px, py, Float32(projection_plane_z)))
-               index = y*width + x
-               host_buffer[index] = direction.z
+    with dir_x_buffer.map_to_host() as host_x_buffer:
+        with dir_y_buffer.map_to_host() as host_y_buffer:
+            with dir_z_buffer.map_to_host() as host_z_buffer:
+                for y in range(height):
+                    for x in range(width):
+                        index = y*width + x
+                        px = Float32(x - width / 2) / width * viewport
+                        py = Float32(-(y - height / 2) / height * viewport)
+                        direction = norm(Vec3(px, py, Float32(projection_plane_z)))
+                        host_x_buffer[index] = direction.x
+                        host_y_buffer[index] = direction.y
+                        host_z_buffer[index] = direction.z
 
     alias layout = Layout.row_major(blocks, threads)
     alias xyzTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
