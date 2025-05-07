@@ -133,10 +133,12 @@ def main():
         hit_b_tensor: xyzTensor
     ):
 
+        var bix = block_idx.x
+        var tix = thread_idx.x
         var direction = Vec3(
-            dir_x_tensor[block_idx.x, thread_idx.x][0],
-            dir_y_tensor[block_idx.x, thread_idx.x][0],
-            dir_z_tensor[block_idx.x, thread_idx.x][0])
+            dir_x_tensor[bix, tix][0],
+            dir_y_tensor[bix, tix][0],
+            dir_z_tensor[bix, tix][0])
         var min_t = Float32(999999999)
         var hit_color = Color(0, 0, 0)
         t = sphere.intersect(camera, direction)
@@ -150,9 +152,9 @@ def main():
                 min(255, (brightness * sphere.color.r)),
                 min(255, (brightness * sphere.color.g)),
                 min(255, (brightness * sphere.color.b)))
-        hit_r_tensor[block_idx.x, thread_idx.x][0] = hit_color.r
-        hit_g_tensor[block_idx.x, thread_idx.x][0] = hit_color.g
-        hit_b_tensor[block_idx.x, thread_idx.x][0] = hit_color.b
+        hit_r_tensor[bix, tix][0] = hit_color.r
+        hit_g_tensor[bix, tix][0] = hit_color.g
+        hit_b_tensor[bix, tix][0] = hit_color.b
 
 
     ctx.enqueue_function[trace](
