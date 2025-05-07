@@ -15,6 +15,7 @@ struct Color:
         writer.write("Color: ", self.r, ", ", self.g, ", ", self.b)
 
 @value
+
 struct Vec3(Copyable, Writable):
     var x: Float32
     var y: Float32
@@ -23,20 +24,11 @@ struct Vec3(Copyable, Writable):
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("Vec3: ", self.x, ", ", self.y, ", ", self.z)
 
+@value
 struct Sphere:
     var center: Vec3
     var radius: Float32
     var color: Color
-
-    fn __init__(out self, center: Vec3, radius: Float32, color: Color):
-        self.center = center
-        self.radius = radius
-        self.color = color
-
-    fn __copyinit__(out self, other: Self):
-        self.center = other.center
-        self.radius = other.radius
-        self.color = other.color
 
     fn intersect(self, ray_origin: Vec3, ray_dir: Vec3) -> Optional[Float32]:
         oc = sub(ray_origin, self.center)
