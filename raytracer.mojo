@@ -69,6 +69,12 @@ fn norm(v: Vec3) -> Vec3:
 
 alias width = 800
 alias height = 600
+alias dtype = DType.float32
+alias blocks = width
+alias threads = height
+alias colors = 3
+alias elements_in = blocks * threads * colors
+
 
 fn compute_direction(x: Int, y: Int) -> Vec3:
     px = Float32(x - width / 2) / width
@@ -96,6 +102,33 @@ fn trace(
             min(255, (brightness * sphere.color.b)))
     return hit_color
 
+alias layout = Layout.row_major(blocks, threads)
+alias xyzTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
+
+fn trace_gpu(
+    sphere: Sphere,
+    camera: Vec3,
+    light_pos: Vec3,
+    dir_x_tensor: xyzTensor,
+    dir_y_tensor: xyzTensor,
+    dir_z_tensor: xyzTensor,
+    hit_r_tensor: xyzTensor,
+    hit_g_tensor: xyzTensor,
+    hit_b_tensor: xyzTensor
+):
+    var bix = block_idx.x
+    var tix = thread_idx.x
+    var direction = Vec3(
+        dir_x_tensor[bix, tix][0],
+        dir_y_tensor[bix, tix][0],
+        dir_z_tensor[bix, tix][0])
+
+    hit_color = trace(direction, sphere, camera, light_pos)
+
+    hit_r_tensor[bix, tix][0] = hit_color.r
+    hit_g_tensor[bix, tix][0] = hit_color.g
+    hit_b_tensor[bix, tix][0] = hit_color.b
+
 
 fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3):
     var direction = compute_direction(x, y)
@@ -107,12 +140,6 @@ def main():
     var start_time = monotonic()
 
     var ctx = DeviceContext()
-
-    alias dtype = DType.float32
-    alias blocks = width
-    alias threads = height
-    alias colors = 3
-    alias elements_in = blocks * threads * colors
 
     var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(255, 0, 0))
     var camera = Vec3(0, 0, -2)
@@ -138,8 +165,6 @@ def main():
                         host_y_buffer[index] = direction.y
                         host_z_buffer[index] = direction.z
 
-    alias layout = Layout.row_major(blocks, threads)
-    alias xyzTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
     var dir_x_tensor = LayoutTensor[dtype, layout](dir_x_buffer)
     var dir_y_tensor = LayoutTensor[dtype, layout](dir_y_buffer)
     var dir_z_tensor = LayoutTensor[dtype, layout](dir_z_buffer)
@@ -147,34 +172,13 @@ def main():
     var hit_g_tensor = LayoutTensor[dtype, layout](hit_g_buffer)
     var hit_b_tensor = LayoutTensor[dtype, layout](hit_b_buffer)
 
-    @parameter
-    fn trace_gpu(
-        camera: Vec3,
-        dir_x_tensor: xyzTensor,
-        dir_y_tensor: xyzTensor,
-        dir_z_tensor: xyzTensor,
-        hit_r_tensor: xyzTensor,
-        hit_g_tensor: xyzTensor,
-        hit_b_tensor: xyzTensor
-    ):
-        var bix = block_idx.x
-        var tix = thread_idx.x
-        var direction = Vec3(
-            dir_x_tensor[bix, tix][0],
-            dir_y_tensor[bix, tix][0],
-            dir_z_tensor[bix, tix][0])
-
-        hit_color = trace(direction, sphere, camera, light_pos)
-
-        hit_r_tensor[bix, tix][0] = hit_color.r
-        hit_g_tensor[bix, tix][0] = hit_color.g
-        hit_b_tensor[bix, tix][0] = hit_color.b
-
     var enqueue_time = monotonic()
     print("Time before enqueue: ", (enqueue_time - start_time)/1000000, "ms")
 
     ctx.enqueue_function[trace_gpu](
+        sphere,
         camera,
+        light_pos,
         dir_x_tensor,
         dir_y_tensor,
         dir_z_tensor,
