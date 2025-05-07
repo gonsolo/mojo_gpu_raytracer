@@ -67,8 +67,8 @@ fn norm(v: Vec3) -> Vec3:
     else:
         return v
 
-alias width = 256
-alias height = 256
+alias width = 512
+alias height = 512
 alias dtype = DType.float32
 alias blocks = width
 alias threads = height
@@ -247,13 +247,16 @@ def write_ppm(name: String, buffer: List[Color]):
             for x in range(width):
                 var index = y*width + x
                 var hit_color = buffer[index]
-                var rgb = String(255 * hit_color.r) + " " + String(255 * hit_color.g) + " " + String(255 * hit_color.b) + " "
+                var ri = Int(255 * hit_color.r)
+                var gi = Int(255 * hit_color.g)
+                var bi = Int(255 * hit_color.b)
+                var rgb = String(ri) + " " + String(gi) + " " + String(bi) + " "
                 f.write(rgb)
         f.write("\n")
 
 def main():
 
-    var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(1, 0, 0))
+    var sphere = Sphere(Vec3(0, -0.25, 3), 1.5, Color(1, 0, 0))
     var camera = Vec3(0, 0, -2)
     var light_pos = Vec3(5, 5, -10)
 
