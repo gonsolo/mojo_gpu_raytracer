@@ -72,9 +72,7 @@ alias height = 600
 alias dtype = DType.float32
 alias blocks = width
 alias threads = height
-alias colors = 3
-alias elements_in = blocks * threads * colors
-
+alias elements_in = blocks * threads
 
 fn compute_direction(x: Int, y: Int) -> Vec3:
     px = Float32(x - width / 2) / width
