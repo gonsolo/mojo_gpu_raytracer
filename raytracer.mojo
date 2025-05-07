@@ -84,18 +84,8 @@ fn trace(
         min_t = t.value()
         hit_point = add(camera, mul(direction, t.value()))
         normal = norm(sub(hit_point, sphere.center))
-        #hit_color = Color(normal.x, normal.y, normal.z)
         light_dir = norm(sub(light_pos, hit_point))
-        #hit_color = Color(light_dir.x, light_dir.y, light_dir.z)
-        #brightness = max(dot(normal, light_dir), 0)
         brightness = dot(normal, light_dir)
-        #hit_color = Color(brightness, brightness, brightness)
-
-        #hit_color = Color(
-        #    min(255, (brightness * sphere.color.r)),
-        #    min(255, (brightness * sphere.color.g)),
-        #    min(255, (brightness * sphere.color.b)))
-
         hit_color = Color(
             brightness * sphere.color.r,
             brightness * sphere.color.g,
@@ -128,7 +118,6 @@ fn trace_gpu(
     hit_r_tensor[bix, tix][0] = hit_color.r
     hit_g_tensor[bix, tix][0] = hit_color.g
     hit_b_tensor[bix, tix][0] = hit_color.b
-
 
 fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) -> Color:
     var direction = compute_direction(x, y)
