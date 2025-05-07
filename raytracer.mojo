@@ -3,6 +3,7 @@ from gpu import thread_idx, block_idx
 from gpu.host import DeviceContext
 from layout import Layout, LayoutTensor
 from math import sqrt
+from time.time import monotonic
 
 struct Color:
     var r: Float32
@@ -76,6 +77,8 @@ fn norm(v: Vec3) -> Vec3:
     return mul(v, 1/length)
 
 def main():
+
+    var start_time = monotonic()
 
     var ctx = DeviceContext()
 
@@ -154,6 +157,9 @@ def main():
         hit_g_tensor[bix, tix][0] = hit_color.g
         hit_b_tensor[bix, tix][0] = hit_color.b
 
+    var enqueue_time = monotonic()
+    print("Time before enqueue: ", (enqueue_time - start_time)/1000000, "ms")
+
     ctx.enqueue_function[trace](
         camera,
         dir_x_tensor,
@@ -165,6 +171,8 @@ def main():
         grid_dim=blocks,
         block_dim=threads,
     )
+    var ppm_time = monotonic()
+    print("Time before ppm: ", (ppm_time - enqueue_time)/1000000, "ms")
 
     with open("render.ppm", "w") as f:
         f.write("P3\n")
@@ -188,4 +196,6 @@ def main():
                             f.write(String(b))
                             f.write(" ")
         f.write("\n")
+    var end_time = monotonic()
+    print("Time before end: ", (end_time - ppm_time)/1000000, "ms")
 
