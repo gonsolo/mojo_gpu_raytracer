@@ -80,10 +80,6 @@ fn norm(v: Vec3) -> Vec3:
     return mul(v, 1/length)
 
 def main():
-    fn printing_kernel():
-        print(
-            "block: [", block_idx.x, block_idx.y, block_idx.z, "]",
-            "thread: [", thread_idx.x, thread_idx.y, thread_idx.z, "]")
 
     var ctx = DeviceContext()
 
