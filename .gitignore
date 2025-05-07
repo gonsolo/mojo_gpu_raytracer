@@ -1,2 +1,3 @@
 raytracer
-render.ppm
+cpu.ppm
+gpu.ppm
