@@ -118,7 +118,6 @@ def main():
     var hit_b_tensor = LayoutTensor[dtype, layout](hit_b_buffer)
 
     var camera = Vec3(0, 0, -2)
-
     var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(255, 0, 0))
     var light_pos = Vec3(5, 5, -10)
 
@@ -132,7 +131,6 @@ def main():
         hit_g_tensor: xyzTensor,
         hit_b_tensor: xyzTensor
     ):
-
         var bix = block_idx.x
         var tix = thread_idx.x
         var direction = Vec3(
@@ -155,7 +153,6 @@ def main():
         hit_r_tensor[bix, tix][0] = hit_color.r
         hit_g_tensor[bix, tix][0] = hit_color.g
         hit_b_tensor[bix, tix][0] = hit_color.b
-
 
     ctx.enqueue_function[trace](
         camera,
