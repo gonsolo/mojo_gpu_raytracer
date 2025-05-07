@@ -1,5 +1,5 @@
 all: view
-raytracer:
+raytracer: raytracer.mojo
 	mojo build raytracer.mojo
 render.ppm: raytracer
 	./raytracer

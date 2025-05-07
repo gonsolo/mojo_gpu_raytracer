@@ -79,14 +79,6 @@ fn norm(v: Vec3) -> Vec3:
     length = sqrt(dot(v, v))
     return mul(v, 1/length)
 
-struct Pixel:
-    var x: Float32
-    var y: Float32
-
-    fn __init__(out self, x: Float32, y: Float32):
-        self.x = x
-        self.y = y
-
 def main():
     fn printing_kernel():
         print(
