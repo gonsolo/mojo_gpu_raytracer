@@ -4,6 +4,7 @@ from gpu.host import DeviceContext
 from layout import Layout, LayoutTensor
 from math import sqrt
 from time.time import monotonic
+from sys.terminate import exit
 
 @value
 struct Color:
@@ -128,10 +129,24 @@ fn trace_gpu(
     hit_b_tensor[bix, tix][0] = hit_color.b
 
 
-fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3):
+fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) -> Color:
     var direction = compute_direction(x, y)
     var hit_color = trace(direction, sphere, camera, light_pos)
-    print(hit_color)
+    return hit_color
+
+def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
+    with open("render.ppm", "w") as f:
+            f.write("P3\n")
+            f.write(String(width))
+            f.write(" ")
+            f.write(String(height))
+            f.write("\n255\n")
+            for y in range(height):
+                for x in range(width):
+                    hit_color = trace_pixel(x, y, sphere, camera, light_pos)
+                    rgb = String(hit_color.r) + " " + String(hit_color.g) + " " + String(hit_color.b) + " "
+                    f.write(rgb)
+            f.write("\n")
 
 def main():
 
@@ -143,7 +158,8 @@ def main():
     var camera = Vec3(0, 0, -2)
     var light_pos = Vec3(5, 5, -10)
 
-    trace_pixel(405, 322, sphere, camera, light_pos)
+    render_cpu(sphere, camera, light_pos)
+    exit()
 
     var dir_x_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var dir_y_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
