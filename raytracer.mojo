@@ -20,6 +20,15 @@ struct Color:
         self.g = other.g
         self.b = other.b
 
+@value
+struct Vec3(Copyable, Writable):
+    var x: Float32
+    var y: Float32
+    var z: Float32
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write("Vec3: ", self.x, ", ", self.y, ", ", self.z)
+
 struct Sphere:
     var center: Vec3
     var radius: Float32
@@ -49,21 +58,6 @@ struct Sphere:
         else:
             return None
 
-struct Vec3(Copyable):
-    var x: Float32
-    var y: Float32
-    var z: Float32
-
-    fn __init__(out self, x: Float32, y: Float32, z: Float32):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    fn __copyinit__(out self, other: Self):
-        self.x = other.x
-        self.y = other.y
-        self.z = other.z
-
 fn dot(a: Vec3, b: Vec3) -> Float32:
     return a.x*b.x + a.y*b.y + a.z*b.z
 fn sub(a: Vec3, b: Vec3) -> Vec3:
@@ -74,7 +68,21 @@ fn mul(a: Vec3, s: Float32) -> Vec3:
     return Vec3(a.x*s, a.y*s, a.z*s)
 fn norm(v: Vec3) -> Vec3:
     length = sqrt(dot(v, v))
-    return mul(v, 1/length)
+    if length > 0.01:
+        return mul(v, 1/length)
+    else:
+        return v
+
+alias width = 800
+alias height = 600
+
+fn compute_direction(x: Int, y: Int) -> Vec3:
+    px = Float32(x - width / 2) / width
+    py = Float32(-(y - height / 2) / height)
+    return norm(Vec3(px, py, 1))
+
+fn trace_pixel(x: Int, y: Int):
+    print(compute_direction(x, y))
 
 def main():
 
@@ -82,14 +90,13 @@ def main():
 
     var ctx = DeviceContext()
 
-    alias width = 800
-    alias height = 600
     alias dtype = DType.float32
     alias blocks = width
     alias threads = height
     alias colors = 3
     alias elements_in = blocks * threads * colors
-    alias viewport = 1
+
+    trace_pixel(405, 322)
 
     var dir_x_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var dir_y_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
@@ -104,8 +111,8 @@ def main():
                 for y in range(height):
                     for x in range(width):
                         index = y*width + x
-                        px = Float32(x - width / 2) / width * viewport
-                        py = Float32(-(y - height / 2) / height * viewport)
+                        px = Float32(x - width / 2) / width
+                        py = Float32(-(y - height / 2) / height)
                         direction = norm(Vec3(px, py, 1))
                         host_x_buffer[index] = direction.x
                         host_y_buffer[index] = direction.y
