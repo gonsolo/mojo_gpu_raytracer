@@ -5,20 +5,14 @@ from layout import Layout, LayoutTensor
 from math import sqrt
 from time.time import monotonic
 
+@value
 struct Color:
     var r: Float32
     var g: Float32
     var b: Float32
 
-    fn __init__(out self, r: Float32, g: Float32, b: Float32):
-        self.r = r
-        self.g = g
-        self.b = b
-
-    fn __copyinit__(out self, other: Self):
-        self.r = other.r
-        self.g = other.g
-        self.b = other.b
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write("Color: ", self.r, ", ", self.g, ", ", self.b)
 
 @value
 struct Vec3(Copyable, Writable):
@@ -81,8 +75,32 @@ fn compute_direction(x: Int, y: Int) -> Vec3:
     py = Float32(-(y - height / 2) / height)
     return norm(Vec3(px, py, 1))
 
-fn trace_pixel(x: Int, y: Int):
-    print(compute_direction(x, y))
+fn trace(
+    direction: Vec3,
+    sphere: Sphere,
+    camera: Vec3,
+    light_pos: Vec3
+) -> Color:
+    var min_t = Float32(999999999)
+    var hit_color = Color(0, 0, 0)
+    t = sphere.intersect(camera, direction)
+    if t and t.value() < min_t:
+        min_t = t.value()
+        hit_point = add(camera, mul(direction, t.value()))
+        normal = norm(sub(hit_point, sphere.center))
+        light_dir = norm(sub(light_pos, hit_point))
+        brightness = max(dot(normal, light_dir), 0)
+        hit_color = Color(
+            min(255, (brightness * sphere.color.r)),
+            min(255, (brightness * sphere.color.g)),
+            min(255, (brightness * sphere.color.b)))
+    return hit_color
+
+
+fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3):
+    var direction = compute_direction(x, y)
+    var hit_color = trace(direction, sphere, camera, light_pos)
+    print(hit_color)
 
 def main():
 
@@ -96,7 +114,11 @@ def main():
     alias colors = 3
     alias elements_in = blocks * threads * colors
 
-    trace_pixel(405, 322)
+    var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(255, 0, 0))
+    var camera = Vec3(0, 0, -2)
+    var light_pos = Vec3(5, 5, -10)
+
+    trace_pixel(405, 322, sphere, camera, light_pos)
 
     var dir_x_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var dir_y_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
@@ -125,12 +147,8 @@ def main():
     var hit_g_tensor = LayoutTensor[dtype, layout](hit_g_buffer)
     var hit_b_tensor = LayoutTensor[dtype, layout](hit_b_buffer)
 
-    var camera = Vec3(0, 0, -2)
-    var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(255, 0, 0))
-    var light_pos = Vec3(5, 5, -10)
-
     @parameter
-    fn trace(
+    fn trace_gpu(
         camera: Vec3,
         dir_x_tensor: xyzTensor,
         dir_y_tensor: xyzTensor,
@@ -145,19 +163,9 @@ def main():
             dir_x_tensor[bix, tix][0],
             dir_y_tensor[bix, tix][0],
             dir_z_tensor[bix, tix][0])
-        var min_t = Float32(999999999)
-        var hit_color = Color(0, 0, 0)
-        t = sphere.intersect(camera, direction)
-        if t and t.value() < min_t:
-            min_t = t.value()
-            hit_point = add(camera, mul(direction, t.value()))
-            normal = norm(sub(hit_point, sphere.center))
-            light_dir = norm(sub(light_pos, hit_point))
-            brightness = max(dot(normal, light_dir), 0)
-            hit_color = Color(
-                min(255, (brightness * sphere.color.r)),
-                min(255, (brightness * sphere.color.g)),
-                min(255, (brightness * sphere.color.b)))
+
+        hit_color = trace(direction, sphere, camera, light_pos)
+
         hit_r_tensor[bix, tix][0] = hit_color.r
         hit_g_tensor[bix, tix][0] = hit_color.g
         hit_b_tensor[bix, tix][0] = hit_color.b
@@ -165,7 +173,7 @@ def main():
     var enqueue_time = monotonic()
     print("Time before enqueue: ", (enqueue_time - start_time)/1000000, "ms")
 
-    ctx.enqueue_function[trace](
+    ctx.enqueue_function[trace_gpu](
         camera,
         dir_x_tensor,
         dir_y_tensor,
