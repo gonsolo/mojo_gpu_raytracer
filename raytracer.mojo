@@ -4,7 +4,6 @@ from gpu.host import DeviceContext
 from layout import Layout, LayoutTensor
 from math import sqrt
 from time.time import monotonic
-from sys.terminate import exit
 
 @value
 struct Color:
@@ -148,18 +147,11 @@ def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
                     f.write(rgb)
             f.write("\n")
 
-def main():
+def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
 
     var start_time = monotonic()
 
     var ctx = DeviceContext()
-
-    var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(255, 0, 0))
-    var camera = Vec3(0, 0, -2)
-    var light_pos = Vec3(5, 5, -10)
-
-    render_cpu(sphere, camera, light_pos)
-    exit()
 
     var dir_x_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var dir_y_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
@@ -205,15 +197,15 @@ def main():
     var ppm_time = monotonic()
     print("Time before ppm: ", (ppm_time - enqueue_time)/1000000, "ms")
 
-    with open("render.ppm", "w") as f:
-        f.write("P3\n")
-        f.write(String(width))
-        f.write(" ")
-        f.write(String(height))
-        f.write("\n255\n")
-        with hit_r_buffer.map_to_host() as host_r_buffer:
-            with hit_g_buffer.map_to_host() as host_g_buffer:
-                with hit_b_buffer.map_to_host() as host_b_buffer:
+    with hit_r_buffer.map_to_host() as host_r_buffer:
+        with hit_g_buffer.map_to_host() as host_g_buffer:
+            with hit_b_buffer.map_to_host() as host_b_buffer:
+                with open("render.ppm", "w") as f:
+                    f.write("P3\n")
+                    f.write(String(width))
+                    f.write(" ")
+                    f.write(String(height))
+                    f.write("\n255\n")
                     for y in range(height):
                         for x in range(width):
                             index = y*width + x
@@ -222,7 +214,19 @@ def main():
                             b = Int(255 * host_b_buffer[index])
                             rgb = String(r) + " " + String(g) + " " + String(b) + " "
                             f.write(rgb)
-        f.write("\n")
+                    f.write("\n")
     var end_time = monotonic()
     print("Time before end: ", (end_time - ppm_time)/1000000, "ms")
+
+def main():
+
+    var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(255, 0, 0))
+    var camera = Vec3(0, 0, -2)
+    var light_pos = Vec3(5, 5, -10)
+
+    var cpu = False #True
+    if cpu:
+        render_cpu(sphere, camera, light_pos)
+    else:
+        render_gpu(sphere, camera, light_pos)
 
