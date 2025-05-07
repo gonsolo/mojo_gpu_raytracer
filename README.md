@@ -1,3 +1,3 @@
-Quick'n'dirty GPU raytracer written in Mojo in two hours.
+Quick'n'dirty CPU and GPU raytracer written in Mojo in a few hours.
 
 ![Rendered sphere](gpu.jpeg)
