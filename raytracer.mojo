@@ -15,7 +15,6 @@ struct Color:
         writer.write("Color: ", self.r, ", ", self.g, ", ", self.b)
 
 @value
-
 struct Vec3(Copyable, Writable):
     var x: Float32
     var y: Float32
