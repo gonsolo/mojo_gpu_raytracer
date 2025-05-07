@@ -1,12 +1,8 @@
 from collections import Optional
-from gpu import thread_idx, block_idx, warp, barrier
-from gpu.host import DeviceContext, DeviceBuffer
-from gpu.memory import AddressSpace
-from memory import stack_allocation
+from gpu import thread_idx, block_idx
+from gpu.host import DeviceContext
 from layout import Layout, LayoutTensor
-from math import iota, sqrt
-from sys import sizeof
-from sys.terminate import exit
+from math import sqrt
 
 struct Color:
     var r: Float32
