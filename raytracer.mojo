@@ -133,10 +133,16 @@ fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) ->
     var hit_color = trace(direction, sphere, camera, light_pos)
     return hit_color
 
-def get_hitcolor(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) -> Color:
+def get_hitcolor_cpu(
+    x: Int,
+    y: Int,
+    sphere: Sphere,
+    camera: Vec3,
+    light_pos: Vec3
+) -> Color:
     return trace_pixel(x, y, sphere, camera, light_pos)
 
-fn get_hitcolor2(
+fn get_hitcolor_gpu(
     x: Int,
     y: Int,
     r_buffer: DeviceBuffer,
@@ -151,18 +157,12 @@ fn get_hitcolor2(
 
 def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
 
-    with open("render.ppm", "w") as f:
-            f.write("P3\n")
-            f.write(String(width))
-            f.write(" ")
-            f.write(String(height))
-            f.write("\n255\n")
-            for y in range(height):
-                for x in range(width):
-                    hit_color = get_hitcolor(x, y, sphere, camera, light_pos)
-                    rgb = String(hit_color.r) + " " + String(hit_color.g) + " " + String(hit_color.b) + " "
-                    f.write(rgb)
-            f.write("\n")
+    buffer = List[Color]()
+    for y in range(height):
+        for x in range(width):
+            hit_color = get_hitcolor_cpu(x, y, sphere, camera, light_pos)
+            buffer.append(hit_color)
+    write_ppm(buffer)
 
 def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
 
@@ -214,24 +214,32 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
     var ppm_time = monotonic()
     print("Time before ppm: ", (ppm_time - enqueue_time)/1000000, "ms")
 
+    buffer = List[Color]()
     with hit_r_buffer.map_to_host() as host_r_buffer:
         with hit_g_buffer.map_to_host() as host_g_buffer:
             with hit_b_buffer.map_to_host() as host_b_buffer:
-
-                with open("render.ppm", "w") as f:
-                    f.write("P3\n")
-                    f.write(String(width))
-                    f.write(" ")
-                    f.write(String(height))
-                    f.write("\n255\n")
-                    for y in range(height):
-                        for x in range(width):
-                            var hit_color = get_hitcolor2(x, y, host_r_buffer, host_g_buffer, host_b_buffer)
-                            var rgb = String(hit_color.r) + " " + String(hit_color.g) + " " + String(hit_color.b) + " "
-                            f.write(rgb)
-                    f.write("\n")
+                for y in range(height):
+                    for x in range(width):
+                        var hit_color = get_hitcolor_gpu(x, y, host_r_buffer, host_g_buffer, host_b_buffer)
+                        buffer.append(hit_color)
+    write_ppm(buffer)
     var end_time = monotonic()
     print("Time before end: ", (end_time - ppm_time)/1000000, "ms")
+
+def write_ppm(buffer: List[Color]):
+    with open("render.ppm", "w") as f:
+        f.write("P3\n")
+        f.write(String(width))
+        f.write(" ")
+        f.write(String(height))
+        f.write("\n255\n")
+        for y in range(height):
+            for x in range(width):
+                var index = y*width + x
+                var hit_color = buffer[index]
+                var rgb = String(hit_color.r) + " " + String(hit_color.g) + " " + String(hit_color.b) + " "
+                f.write(rgb)
+        f.write("\n")
 
 def main():
 
