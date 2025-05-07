@@ -86,12 +86,11 @@ def main():
     alias width = 800
     alias height = 600
     alias dtype = DType.float32
-    alias blocks = 800
-    alias threads = 600
+    alias blocks = width
+    alias threads = height
     alias colors = 3
     alias elements_in = blocks * threads * colors
     alias viewport = 1
-    alias projection_plane_z = 1
 
     var dir_x_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var dir_y_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
@@ -108,7 +107,7 @@ def main():
                         index = y*width + x
                         px = Float32(x - width / 2) / width * viewport
                         py = Float32(-(y - height / 2) / height * viewport)
-                        direction = norm(Vec3(px, py, Float32(projection_plane_z)))
+                        direction = norm(Vec3(px, py, 1))
                         host_x_buffer[index] = direction.x
                         host_y_buffer[index] = direction.y
                         host_z_buffer[index] = direction.z
