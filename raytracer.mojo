@@ -200,6 +200,14 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
     with hit_r_buffer.map_to_host() as host_r_buffer:
         with hit_g_buffer.map_to_host() as host_g_buffer:
             with hit_b_buffer.map_to_host() as host_b_buffer:
+
+                fn get_hitcolor(x: Int, y: Int) -> Color:
+                    var index = y*width + x
+                    r = Int(255 * host_r_buffer[index])
+                    g = Int(255 * host_g_buffer[index])
+                    b = Int(255 * host_b_buffer[index])
+                    return Color(r, g, b)
+
                 with open("render.ppm", "w") as f:
                     f.write("P3\n")
                     f.write(String(width))
@@ -208,11 +216,8 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
                     f.write("\n255\n")
                     for y in range(height):
                         for x in range(width):
-                            index = y*width + x
-                            r = Int(255 * host_r_buffer[index])
-                            g = Int(255 * host_g_buffer[index])
-                            b = Int(255 * host_b_buffer[index])
-                            rgb = String(r) + " " + String(g) + " " + String(b) + " "
+                            var hit_color = get_hitcolor(x, y)
+                            rgb = String(hit_color.r) + " " + String(hit_color.g) + " " + String(hit_color.b) + " "
                             f.write(rgb)
                     f.write("\n")
     var end_time = monotonic()
