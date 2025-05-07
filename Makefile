@@ -1,12 +1,12 @@
 all: view
 raytracer: raytracer.mojo
 	mojo build raytracer.mojo
-render.ppm: raytracer
+cpu.ppm gpu.ppm: raytracer
 	./raytracer
-render.jpeg: render.ppm
+gpu.jpeg: gpu.ppm
 	magick render.ppm render.jpeg
-view: render.ppm
-	gimp render.ppm
+view: cpu.ppm gpu.ppm
+	gimp cpu.ppm gpu.ppm
 e edit:
 	vi raytracer.mojo
 clean:

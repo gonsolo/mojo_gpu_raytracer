@@ -67,8 +67,8 @@ fn norm(v: Vec3) -> Vec3:
     else:
         return v
 
-alias width = 800
-alias height = 600
+alias width = 256
+alias height = 256
 alias dtype = DType.float32
 alias blocks = width
 alias threads = height
@@ -92,12 +92,22 @@ fn trace(
         min_t = t.value()
         hit_point = add(camera, mul(direction, t.value()))
         normal = norm(sub(hit_point, sphere.center))
+        #hit_color = Color(normal.x, normal.y, normal.z)
         light_dir = norm(sub(light_pos, hit_point))
-        brightness = max(dot(normal, light_dir), 0)
+        #hit_color = Color(light_dir.x, light_dir.y, light_dir.z)
+        #brightness = max(dot(normal, light_dir), 0)
+        brightness = dot(normal, light_dir)
+        #hit_color = Color(brightness, brightness, brightness)
+
+        #hit_color = Color(
+        #    min(255, (brightness * sphere.color.r)),
+        #    min(255, (brightness * sphere.color.g)),
+        #    min(255, (brightness * sphere.color.b)))
+
         hit_color = Color(
-            min(255, (brightness * sphere.color.r)),
-            min(255, (brightness * sphere.color.g)),
-            min(255, (brightness * sphere.color.b)))
+            brightness * sphere.color.r,
+            brightness * sphere.color.g,
+            brightness * sphere.color.b)
     return hit_color
 
 alias layout = Layout.row_major(blocks, threads)
@@ -121,7 +131,7 @@ fn trace_gpu(
         dir_y_tensor[bix, tix][0],
         dir_z_tensor[bix, tix][0])
 
-    hit_color = trace(direction, sphere, camera, light_pos)
+    var hit_color = trace(direction, sphere, camera, light_pos)
 
     hit_r_tensor[bix, tix][0] = hit_color.r
     hit_g_tensor[bix, tix][0] = hit_color.g
@@ -145,26 +155,26 @@ def get_hitcolor_cpu(
 fn get_hitcolor_gpu(
     x: Int,
     y: Int,
-    r_buffer: DeviceBuffer,
-    g_buffer: DeviceBuffer,
-    b_buffer: DeviceBuffer
+    r_buffer: DeviceBuffer[dtype],
+    g_buffer: DeviceBuffer[dtype],
+    b_buffer: DeviceBuffer[dtype]
 ) -> Color:
     var index = y*width + x
-    r = Int(255 * r_buffer[index])
-    g = Int(255 * g_buffer[index])
-    b = Int(255 * b_buffer[index])
+    r = r_buffer[index]
+    g = g_buffer[index]
+    b = b_buffer[index]
     return Color(r, g, b)
 
-def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
+def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 
     buffer = List[Color]()
     for y in range(height):
         for x in range(width):
             hit_color = get_hitcolor_cpu(x, y, sphere, camera, light_pos)
             buffer.append(hit_color)
-    write_ppm(buffer)
+    return buffer
 
-def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
+def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 
     var start_time = monotonic()
 
@@ -222,12 +232,12 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3):
                     for x in range(width):
                         var hit_color = get_hitcolor_gpu(x, y, host_r_buffer, host_g_buffer, host_b_buffer)
                         buffer.append(hit_color)
-    write_ppm(buffer)
     var end_time = monotonic()
     print("Time before end: ", (end_time - ppm_time)/1000000, "ms")
+    return buffer
 
-def write_ppm(buffer: List[Color]):
-    with open("render.ppm", "w") as f:
+def write_ppm(name: String, buffer: List[Color]):
+    with open(name, "w") as f:
         f.write("P3\n")
         f.write(String(width))
         f.write(" ")
@@ -237,19 +247,17 @@ def write_ppm(buffer: List[Color]):
             for x in range(width):
                 var index = y*width + x
                 var hit_color = buffer[index]
-                var rgb = String(hit_color.r) + " " + String(hit_color.g) + " " + String(hit_color.b) + " "
+                var rgb = String(255 * hit_color.r) + " " + String(255 * hit_color.g) + " " + String(255 * hit_color.b) + " "
                 f.write(rgb)
         f.write("\n")
 
 def main():
 
-    var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(255, 0, 0))
+    var sphere = Sphere(Vec3(0, -0.25, 3), 0.5, Color(1, 0, 0))
     var camera = Vec3(0, 0, -2)
     var light_pos = Vec3(5, 5, -10)
 
-    var cpu = False
-    if cpu:
-        render_cpu(sphere, camera, light_pos)
-    else:
-        render_gpu(sphere, camera, light_pos)
-
+    var cpu_buffer = render_cpu(sphere, camera, light_pos)
+    var gpu_buffer = render_gpu(sphere, camera, light_pos)
+    write_ppm("cpu.ppm", cpu_buffer)
+    write_ppm("gpu.ppm", gpu_buffer)
