@@ -111,9 +111,7 @@ def main():
                 for y in range(height):
                     for x in range(width):
                         index = y*width + x
-                        px = Float32(x - width / 2) / width
-                        py = Float32(-(y - height / 2) / height)
-                        direction = norm(Vec3(px, py, 1))
+                        direction = compute_direction(x, y)
                         host_x_buffer[index] = direction.x
                         host_y_buffer[index] = direction.y
                         host_z_buffer[index] = direction.z
