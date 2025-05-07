@@ -7,8 +7,8 @@ render.jpeg: render.ppm
 	magick render.ppm render.jpeg
 view: render.ppm
 	gimp render.ppm
-edit:
+e edit:
 	vi raytracer.mojo
 clean:
 	rm -f raytracer render.ppm
-.PHONY: all edit view
+.PHONY: all e edit view
