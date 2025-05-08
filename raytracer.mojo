@@ -5,6 +5,16 @@ from layout import Layout, LayoutTensor
 from math import sqrt
 from time.time import monotonic
 
+alias width = 512
+alias height = 512
+alias dtype = DType.float32
+alias blocks = width
+alias threads = height
+alias channels = 3
+alias elements_in = blocks * threads * channels
+alias layout = Layout.row_major(blocks, threads, channels)
+alias xyzTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
+
 @value
 struct Color:
     var r: Float32
@@ -58,13 +68,6 @@ fn norm(v: Vec3) -> Vec3:
     else:
         return v
 
-alias width = 512
-alias height = 512
-alias dtype = DType.float32
-alias blocks = width
-alias threads = height
-alias elements_in = blocks * threads
-
 fn compute_direction(x: Int, y: Int) -> Vec3:
     px = Float32(x - width / 2) / width
     py = Float32(-(y - height / 2) / height)
@@ -90,9 +93,6 @@ fn trace(
             brightness * sphere.color.g,
             brightness * sphere.color.b)
     return hit_color
-
-alias layout = Layout.row_major(blocks, threads, 1)
-alias xyzTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
 
 fn trace_gpu(
     sphere: Sphere,
@@ -132,7 +132,7 @@ fn get_hitcolor_gpu(
     g_buffer: DeviceBuffer[dtype],
     b_buffer: DeviceBuffer[dtype]
 ) -> Color:
-    var index = y*width + x
+    var index = (y*width + x) * channels
     r = r_buffer[index]
     g = g_buffer[index]
     b = b_buffer[index]
