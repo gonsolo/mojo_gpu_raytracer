@@ -68,6 +68,9 @@ fn norm(v: Vec3) -> Vec3:
     else:
         return v
 
+fn nano_to_milliseconds(nanoseconds: UInt) -> UInt:
+    return nanoseconds // 1000000
+
 fn compute_direction(x: Int, y: Int) -> Vec3:
     px = Float32(x - width / 2) / width
     py = Float32(-(y - height / 2) / height)
@@ -149,11 +152,14 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 
     var ctx = DeviceContext()
 
+    var create_time = monotonic()
+    print("Time before create: ", nano_to_milliseconds(create_time - start_time), "ms")
+
     var hit_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var hit_tensor = LayoutTensor[dtype, layout](hit_buffer)
 
     var enqueue_time = monotonic()
-    print("Time before enqueue: ", (enqueue_time - start_time)/1000000, "ms")
+    print("Time before enqueue: ", nano_to_milliseconds(enqueue_time - create_time), "ms")
 
     ctx.enqueue_function[trace_gpu](
         sphere,
@@ -164,7 +170,7 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
         block_dim=threads,
     )
     var ppm_time = monotonic()
-    print("Time before ppm: ", (ppm_time - enqueue_time)/1000000, "ms")
+    print("Time before ppm: ", nano_to_milliseconds(ppm_time - enqueue_time), "ms")
 
     buffer = List[Color]()
     with hit_buffer.map_to_host() as host_buffer:
@@ -173,7 +179,7 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
                 var hit_color = get_hitcolor_gpu(x, y, host_buffer)
                 buffer.append(hit_color)
     var end_time = monotonic()
-    print("Time before end: ", (end_time - ppm_time)/1000000, "ms")
+    print("Time before end: ", nano_to_milliseconds(end_time - ppm_time), "ms")
     return buffer
 
 def write_ppm(name: String, buffer: List[Color]):
