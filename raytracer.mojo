@@ -1,6 +1,6 @@
 from collections import Optional
 from gpu import thread_idx, block_idx
-from gpu.host import DeviceContext, DeviceBuffer
+from gpu.host import DeviceContext, DeviceBuffer, HostBuffer
 from layout import Layout, LayoutTensor
 from math import sqrt
 from time.time import monotonic
@@ -82,11 +82,9 @@ fn trace(
     camera: Vec3,
     light_pos: Vec3
 ) -> Color:
-    var min_t = Float32(999999999)
     var hit_color = Color(0, 0, 0)
     t = sphere.intersect(camera, direction)
-    if t and t.value() < min_t:
-        min_t = t.value()
+    if t:
         hit_point = add(camera, mul(direction, t.value()))
         normal = norm(sub(hit_point, sphere.center))
         light_dir = norm(sub(light_pos, hit_point))
@@ -129,7 +127,7 @@ def get_hitcolor_cpu(
 fn get_hitcolor_gpu(
     x: Int,
     y: Int,
-    buffer: DeviceBuffer[dtype],
+    buffer: HostBuffer[dtype],
 ) -> Color:
     var index = (y*width + x) * channels
     r = buffer[index+0]
