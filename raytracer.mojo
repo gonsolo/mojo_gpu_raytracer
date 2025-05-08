@@ -208,5 +208,9 @@ def main():
 
     var cpu_buffer = render_cpu(sphere, camera, light_pos)
     var gpu_buffer = render_gpu(sphere, camera, light_pos)
+
+    var pre_ppm_time = monotonic()
     write_ppm("cpu.ppm", cpu_buffer)
     write_ppm("gpu.ppm", gpu_buffer)
+    var post_ppm_time = monotonic()
+    print("Time to write ppm: ", nano_to_milliseconds(post_ppm_time - pre_ppm_time), "ms")
