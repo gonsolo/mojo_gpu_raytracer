@@ -10,5 +10,5 @@ view: cpu.ppm gpu.ppm
 e edit:
 	vi raytracer.mojo
 clean:
-	rm -f raytracer *.ppm
+	git clean -dfx
 .PHONY: all e edit view
