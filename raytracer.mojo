@@ -91,7 +91,7 @@ fn trace(
             brightness * sphere.color.b)
     return hit_color
 
-alias layout = Layout.row_major(blocks, threads)
+alias layout = Layout.row_major(blocks, threads, 1)
 alias xyzTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
 
 fn trace_gpu(
@@ -107,9 +107,9 @@ fn trace_gpu(
     var direction = compute_direction(x, y)
     var hit_color = trace(direction, sphere, camera, light_pos)
 
-    hit_r_tensor[y, x][0] = hit_color.r
-    hit_g_tensor[y, x][0] = hit_color.g
-    hit_b_tensor[y, x][0] = hit_color.b
+    hit_r_tensor[y, x, 0][0] = hit_color.r
+    hit_g_tensor[y, x, 0][0] = hit_color.g
+    hit_b_tensor[y, x, 0][0] = hit_color.b
 
 fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) -> Color:
     var direction = compute_direction(x, y)
