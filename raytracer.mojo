@@ -99,8 +99,6 @@ fn trace_gpu(
     camera: Vec3,
     light_pos: Vec3,
     hit_r_tensor: xyzTensor,
-    hit_g_tensor: xyzTensor,
-    hit_b_tensor: xyzTensor
 ):
     var y = block_idx.x
     var x = thread_idx.x
@@ -108,8 +106,8 @@ fn trace_gpu(
     var hit_color = trace(direction, sphere, camera, light_pos)
 
     hit_r_tensor[y, x, 0][0] = hit_color.r
-    hit_g_tensor[y, x, 0][0] = hit_color.g
-    hit_b_tensor[y, x, 0][0] = hit_color.b
+    hit_r_tensor[y, x, 1][0] = hit_color.g
+    hit_r_tensor[y, x, 2][0] = hit_color.b
 
 fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) -> Color:
     var direction = compute_direction(x, y)
@@ -129,13 +127,11 @@ fn get_hitcolor_gpu(
     x: Int,
     y: Int,
     r_buffer: DeviceBuffer[dtype],
-    g_buffer: DeviceBuffer[dtype],
-    b_buffer: DeviceBuffer[dtype]
 ) -> Color:
     var index = (y*width + x) * channels
-    r = r_buffer[index]
-    g = g_buffer[index]
-    b = b_buffer[index]
+    r = r_buffer[index+0]
+    g = r_buffer[index+1]
+    b = r_buffer[index+2]
     return Color(r, g, b)
 
 def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
@@ -154,11 +150,7 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
     var ctx = DeviceContext()
 
     var hit_r_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
-    var hit_g_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
-    var hit_b_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var hit_r_tensor = LayoutTensor[dtype, layout](hit_r_buffer)
-    var hit_g_tensor = LayoutTensor[dtype, layout](hit_g_buffer)
-    var hit_b_tensor = LayoutTensor[dtype, layout](hit_b_buffer)
 
     var enqueue_time = monotonic()
     print("Time before enqueue: ", (enqueue_time - start_time)/1000000, "ms")
@@ -168,8 +160,6 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
         camera,
         light_pos,
         hit_r_tensor,
-        hit_g_tensor,
-        hit_b_tensor,
         grid_dim=blocks,
         block_dim=threads,
     )
@@ -178,12 +168,10 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 
     buffer = List[Color]()
     with hit_r_buffer.map_to_host() as host_r_buffer:
-        with hit_g_buffer.map_to_host() as host_g_buffer:
-            with hit_b_buffer.map_to_host() as host_b_buffer:
-                for y in range(height):
-                    for x in range(width):
-                        var hit_color = get_hitcolor_gpu(x, y, host_r_buffer, host_g_buffer, host_b_buffer)
-                        buffer.append(hit_color)
+        for y in range(height):
+            for x in range(width):
+                var hit_color = get_hitcolor_gpu(x, y, host_r_buffer)
+                buffer.append(hit_color)
     var end_time = monotonic()
     print("Time before end: ", (end_time - ppm_time)/1000000, "ms")
     return buffer
