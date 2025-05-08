@@ -98,25 +98,18 @@ fn trace_gpu(
     sphere: Sphere,
     camera: Vec3,
     light_pos: Vec3,
-    dir_x_tensor: xyzTensor,
-    dir_y_tensor: xyzTensor,
-    dir_z_tensor: xyzTensor,
     hit_r_tensor: xyzTensor,
     hit_g_tensor: xyzTensor,
     hit_b_tensor: xyzTensor
 ):
-    var bix = block_idx.x
-    var tix = thread_idx.x
-    var direction = Vec3(
-        dir_x_tensor[bix, tix][0],
-        dir_y_tensor[bix, tix][0],
-        dir_z_tensor[bix, tix][0])
-
+    var y = block_idx.x
+    var x = thread_idx.x
+    var direction = compute_direction(x, y)
     var hit_color = trace(direction, sphere, camera, light_pos)
 
-    hit_r_tensor[bix, tix][0] = hit_color.r
-    hit_g_tensor[bix, tix][0] = hit_color.g
-    hit_b_tensor[bix, tix][0] = hit_color.b
+    hit_r_tensor[y, x][0] = hit_color.r
+    hit_g_tensor[y, x][0] = hit_color.g
+    hit_b_tensor[y, x][0] = hit_color.b
 
 fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) -> Color:
     var direction = compute_direction(x, y)
@@ -160,27 +153,9 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 
     var ctx = DeviceContext()
 
-    var dir_x_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
-    var dir_y_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
-    var dir_z_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var hit_r_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var hit_g_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var hit_b_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
-
-    with dir_x_buffer.map_to_host() as host_x_buffer:
-        with dir_y_buffer.map_to_host() as host_y_buffer:
-            with dir_z_buffer.map_to_host() as host_z_buffer:
-                for y in range(height):
-                    for x in range(width):
-                        index = y*width + x
-                        direction = compute_direction(x, y)
-                        host_x_buffer[index] = direction.x
-                        host_y_buffer[index] = direction.y
-                        host_z_buffer[index] = direction.z
-
-    var dir_x_tensor = LayoutTensor[dtype, layout](dir_x_buffer)
-    var dir_y_tensor = LayoutTensor[dtype, layout](dir_y_buffer)
-    var dir_z_tensor = LayoutTensor[dtype, layout](dir_z_buffer)
     var hit_r_tensor = LayoutTensor[dtype, layout](hit_r_buffer)
     var hit_g_tensor = LayoutTensor[dtype, layout](hit_g_buffer)
     var hit_b_tensor = LayoutTensor[dtype, layout](hit_b_buffer)
@@ -192,9 +167,6 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
         sphere,
         camera,
         light_pos,
-        dir_x_tensor,
-        dir_y_tensor,
-        dir_z_tensor,
         hit_r_tensor,
         hit_g_tensor,
         hit_b_tensor,
