@@ -1,6 +1,6 @@
 all: view
 raytracer: raytracer.mojo
-	mojo build raytracer.mojo
+	uv run mojo build raytracer.mojo
 cpu.ppm gpu.ppm: raytracer
 	./raytracer
 gpu.jpeg: gpu.ppm
