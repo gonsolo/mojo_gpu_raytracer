@@ -15,8 +15,8 @@ alias elements_in = blocks * threads * channels
 alias layout = Layout.row_major(blocks, threads, channels)
 alias xyzTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
 
-@value
-struct Color:
+@fieldwise_init
+struct Color(Copyable, Movable):
     var r: Float32
     var g: Float32
     var b: Float32
@@ -24,8 +24,8 @@ struct Color:
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("Color: ", self.r, ", ", self.g, ", ", self.b)
 
-@value
-struct Vec3(Copyable, Writable):
+@fieldwise_init
+struct Vec3(Copyable, Movable, Writable):
     var x: Float32
     var y: Float32
     var z: Float32
@@ -33,8 +33,8 @@ struct Vec3(Copyable, Writable):
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("Vec3: ", self.x, ", ", self.y, ", ", self.z)
 
-@value
-struct Sphere:
+@fieldwise_init
+struct Sphere(Copyable, Movable):
     var center: Vec3
     var radius: Float32
     var color: Color
