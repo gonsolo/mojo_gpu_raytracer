@@ -8,7 +8,7 @@ gpu.jpeg: gpu.ppm
 view: cpu.ppm gpu.ppm
 	gimp cpu.ppm gpu.ppm
 e edit:
-	vi raytracer.mojo
+	uv run vim raytracer.mojo
 clean:
 	git clean -dfx
 .PHONY: all e edit view

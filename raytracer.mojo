@@ -33,6 +33,25 @@ struct Vec3(Copyable, Movable, Writable):
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("Vec3: ", self.x, ", ", self.y, ", ", self.z)
 
+    fn __sub__(self, other: Self) -> Self:
+        return Self(self.x - other.x, self.y - other.y, self.z - other.z)
+
+    fn __add__(self, other: Self) -> Self:
+        return Self(self.x+other.x, self.y+other.y, self.z+other.z)
+
+    fn __mul__(self: Self, s: Float32) -> Self:
+        return Self(self.x*s, self.y*s, self.z*s)
+
+    fn dot(self, other: Self) -> Float32:
+        return self.x*other.x + self.y*other.y + self.z*other.z
+
+    fn normalize(self) -> Self:
+        length = sqrt(self.dot(self))
+        if length > 0.01:
+            return self * (1/length)
+        else:
+            return self
+
 @fieldwise_init
 struct Sphere(Copyable, Movable):
     var center: Vec3
@@ -40,10 +59,10 @@ struct Sphere(Copyable, Movable):
     var color: Color
 
     fn intersect(self, ray_origin: Vec3, ray_dir: Vec3) -> Optional[Float32]:
-        oc = sub(ray_origin, self.center)
-        a = dot(ray_dir, ray_dir)
-        b = 2 * dot(oc, ray_dir)
-        c = dot(oc, oc) - self.radius ** 2
+        oc = ray_origin - self.center
+        a = ray_dir.dot(ray_dir)
+        b = 2 * oc.dot(ray_dir)
+        c = oc.dot(oc) - self.radius ** 2
         discriminant = b ** 2 - 4 * a * c
         if discriminant < 0:
             return None
@@ -53,28 +72,13 @@ struct Sphere(Copyable, Movable):
         else:
             return None
 
-fn dot(a: Vec3, b: Vec3) -> Float32:
-    return a.x*b.x + a.y*b.y + a.z*b.z
-fn sub(a: Vec3, b: Vec3) -> Vec3:
-    return Vec3(a.x-b.x, a.y-b.y, a.z-b.z)
-fn add(a: Vec3, b: Vec3) -> Vec3:
-    return Vec3(a.x+b.x, a.y+b.y, a.z+b.z)
-fn mul(a: Vec3, s: Float32) -> Vec3:
-    return Vec3(a.x*s, a.y*s, a.z*s)
-fn norm(v: Vec3) -> Vec3:
-    length = sqrt(dot(v, v))
-    if length > 0.01:
-        return mul(v, 1/length)
-    else:
-        return v
-
 fn nano_to_milliseconds(nanoseconds: UInt) -> UInt:
     return nanoseconds // 1000000
 
 fn compute_direction(x: Int, y: Int) -> Vec3:
     px = Float32(x - width / 2) / width
     py = Float32(-(y - height / 2) / height)
-    return norm(Vec3(px, py, 1))
+    return (Vec3(px, py, 1)).normalize()
 
 fn trace(
     direction: Vec3,
@@ -85,10 +89,10 @@ fn trace(
     var hit_color = Color(0, 0, 0)
     t = sphere.intersect(camera, direction)
     if t:
-        hit_point = add(camera, mul(direction, t.value()))
-        normal = norm(sub(hit_point, sphere.center))
-        light_dir = norm(sub(light_pos, hit_point))
-        brightness = dot(normal, light_dir)
+        hit_point = camera + direction * t.value()
+        normal = (hit_point - sphere.center).normalize()
+        light_dir = (light_pos - hit_point).normalize()
+        brightness = normal.dot(light_dir)
         hit_color = Color(
             brightness * sphere.color.r,
             brightness * sphere.color.g,
@@ -111,6 +115,7 @@ fn trace_gpu(
     hit_tensor[y, x, 2][0] = hit_color.b
 
 fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) -> Color:
+
     var direction = compute_direction(x, y)
     var hit_color = trace(direction, sphere, camera, light_pos)
     return hit_color
@@ -122,6 +127,7 @@ def get_hitcolor_cpu(
     camera: Vec3,
     light_pos: Vec3
 ) -> Color:
+
     return trace_pixel(x, y, sphere, camera, light_pos)
 
 fn get_hitcolor_gpu(
@@ -129,6 +135,7 @@ fn get_hitcolor_gpu(
     y: Int,
     buffer: HostBuffer[dtype],
 ) -> Color:
+
     var index = (y*width + x) * channels
     r = buffer[index+0]
     g = buffer[index+1]
@@ -147,15 +154,11 @@ def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 
     var start_time = monotonic()
-
     var ctx = DeviceContext()
-
     var create_time = monotonic()
     print("Time before create: ", nano_to_milliseconds(create_time - start_time), "ms")
-
     var hit_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var hit_tensor = LayoutTensor[dtype, layout](hit_buffer)
-
     var enqueue_time = monotonic()
     print("Time before enqueue: ", nano_to_milliseconds(enqueue_time - create_time), "ms")
 
