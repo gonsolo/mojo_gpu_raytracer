@@ -50,7 +50,7 @@ struct Vec3(Copyable, Movable, Writable):
         if length > 0.01:
             return self * (1/length)
         else:
-            return self
+            return self.copy()
 
 @fieldwise_init
 struct Sphere(Copyable, Movable):
@@ -97,7 +97,7 @@ fn trace(
             brightness * sphere.color.r,
             brightness * sphere.color.g,
             brightness * sphere.color.b)
-    return hit_color
+    return hit_color^
 
 fn trace_gpu(
     sphere: Sphere,
@@ -118,7 +118,7 @@ fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) ->
 
     var direction = compute_direction(x, y)
     var hit_color = trace(direction, sphere, camera, light_pos)
-    return hit_color
+    return hit_color^
 
 def get_hitcolor_cpu(
     x: Int,
@@ -148,8 +148,8 @@ def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
     for y in range(height):
         for x in range(width):
             hit_color = get_hitcolor_cpu(x, y, sphere, camera, light_pos)
-            buffer.append(hit_color)
-    return buffer
+            buffer.append(hit_color^)
+    return buffer^
 
 def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 
@@ -178,10 +178,10 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
         for y in range(height):
             for x in range(width):
                 var hit_color = get_hitcolor_gpu(x, y, host_buffer)
-                buffer.append(hit_color)
+                buffer.append(hit_color^)
     var end_time = monotonic()
     print("Time before end: ", nano_to_milliseconds(end_time - ppm_time), "ms")
-    return buffer
+    return buffer^
 
 def write_ppm(name: String, buffer: List[Color]):
     with open(name, "w") as f:
@@ -193,7 +193,7 @@ def write_ppm(name: String, buffer: List[Color]):
         for y in range(height):
             for x in range(width):
                 var index = y*width + x
-                var hit_color = buffer[index]
+                var hit_color = buffer[index].copy()
                 var ri = Int(255 * hit_color.r)
                 var gi = Int(255 * hit_color.g)
                 var bi = Int(255 * hit_color.b)

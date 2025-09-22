@@ -1,3 +1,4 @@
-raytracer
-cpu.ppm
-gpu.ppm
+/raytracer
+/cpu.ppm
+/gpu.ppm
+/uv.lock
