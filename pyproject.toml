@@ -5,5 +5,5 @@ description = "A very simple CPU and GPU raytracer"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "modular>=25.6.0",
+    "modular>=25.6.1",
 ]
