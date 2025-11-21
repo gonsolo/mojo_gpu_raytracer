@@ -1,5 +1,6 @@
+from builtin.device_passable import DevicePassable
 from collections import Optional
-from gpu import thread_idx, block_idx
+from gpu import block_idx, thread_idx
 from gpu.host import DeviceContext, DeviceBuffer, HostBuffer
 from layout import Layout, LayoutTensor
 from math import sqrt
@@ -13,10 +14,10 @@ alias threads = height
 alias channels = 3
 alias elements_in = blocks * threads * channels
 alias layout = Layout.row_major(blocks, threads, channels)
-alias xyzTensor = LayoutTensor[dtype, layout, MutableAnyOrigin]
+alias xyzTensor = LayoutTensor[dtype, layout, MutAnyOrigin]
 
 @fieldwise_init
-struct Color(Copyable, Movable):
+struct Color(ImplicitlyCopyable, Movable):
     var r: Float32
     var g: Float32
     var b: Float32
@@ -25,10 +26,30 @@ struct Color(Copyable, Movable):
         writer.write("Color: ", self.r, ", ", self.g, ", ", self.b)
 
 @fieldwise_init
-struct Vec3(Copyable, Movable, Writable):
+struct Vec3(DevicePassable, ImplicitlyCopyable, Movable, Writable):
     var x: Float32
     var y: Float32
     var z: Float32
+
+    comptime device_type: AnyType = Self
+
+    fn _to_device_type(self, target: LegacyOpaquePointer):
+        target.bitcast[Self.device_type]()[] = self
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("Vec3")
+
+    @staticmethod
+    fn get_device_type_name() -> String:
+        """
+        Gets device_type's name, for use in error messages when handing
+        arguments to kernels.
+
+        Returns:
+            This type's name.
+        """
+        return Self.get_type_name()
 
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("Vec3: ", self.x, ", ", self.y, ", ", self.z)
@@ -53,10 +74,23 @@ struct Vec3(Copyable, Movable, Writable):
             return self.copy()
 
 @fieldwise_init
-struct Sphere(Copyable, Movable):
+struct Sphere(DevicePassable, ImplicitlyCopyable, Movable):
     var center: Vec3
     var radius: Float32
     var color: Color
+
+    comptime device_type: AnyType = Self
+
+    fn _to_device_type(self, target: LegacyOpaquePointer):
+        target.bitcast[Self.device_type]()[] = self
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("Sphere")
+
+    @staticmethod
+    fn get_device_type_name() -> String:
+        return Self.get_type_name()
 
     fn intersect(self, ray_origin: Vec3, ray_dir: Vec3) -> Optional[Float32]:
         oc = ray_origin - self.center
@@ -105,8 +139,8 @@ fn trace_gpu(
     light_pos: Vec3,
     hit_tensor: xyzTensor,
 ):
-    var y = block_idx.x
-    var x = thread_idx.x
+    var y = Int(block_idx.x)
+    var x = Int(thread_idx.x)
     var direction = compute_direction(x, y)
     var hit_color = trace(direction, sphere, camera, light_pos)
 
@@ -162,7 +196,10 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
     var enqueue_time = monotonic()
     print("Time before enqueue: ", nano_to_milliseconds(enqueue_time - create_time), "ms")
 
-    ctx.enqueue_function[trace_gpu](
+    ctx.enqueue_function_checked[
+        trace_gpu,
+        trace_gpu
+    ](
         sphere,
         camera,
         light_pos,
