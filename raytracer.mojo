@@ -1,3 +1,4 @@
+from algorithm import parallelize
 from builtin.device_passable import DevicePassable
 from collections import Optional
 from gpu import block_idx, thread_idx
@@ -5,6 +6,7 @@ from gpu.host import DeviceContext, DeviceBuffer, HostBuffer
 from layout import Layout, LayoutTensor
 from math import sqrt
 from time.time import monotonic
+from sys.info import num_logical_cores
 
 alias width = 512
 alias height = 512
@@ -16,6 +18,7 @@ alias elements_in = blocks * threads * channels
 alias layout = Layout.row_major(blocks, threads, channels)
 alias xyzTensor = LayoutTensor[dtype, layout, MutAnyOrigin]
 
+# The memory is allocated on the heap and is ready for use.
 @fieldwise_init
 struct Color(ImplicitlyCopyable, Movable):
     var r: Float32
@@ -176,6 +179,29 @@ fn get_hitcolor_gpu(
     b = buffer[index+2]
     return Color(r, g, b)
 
+def render_cpu_tensor(
+    sphere: Sphere,
+    camera: Vec3,
+    light_pos: Vec3,
+    output_tensor: xyzTensor
+):
+    @parameter
+    fn worker(idx: Int):
+        try:
+            var y = idx // width
+            var x = idx % width
+            hit_color = get_hitcolor_cpu(x, y, sphere, camera, light_pos)
+            output_tensor[y, x, 0] = hit_color.r
+            output_tensor[y, x, 1] = hit_color.g
+            output_tensor[y, x, 2] = hit_color.b
+        except:
+            pass
+
+    var num_pixels = width * height
+    var num_workers = num_logical_cores()
+
+    parallelize[worker](num_pixels, num_workers)
+
 def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
 
     buffer = List[Color]()
@@ -238,11 +264,44 @@ def write_ppm(name: String, buffer: List[Color]):
                 f.write(rgb)
         f.write("\n")
 
+def write_ppm_tensor(name: String, buffer_tensor: xyzTensor):
+    """
+    Writes the content of a 3D LayoutTensor (width x height x channels)
+    to a PPM image file (P3 format).
+    """
+    with open(name, "w") as f:
+        # 1. Write the PPM header
+        f.write("P3\n")
+        f.write(String(width)); f.write(" "); f.write(String(height))
+        f.write("\n255\n") # Max color value
+
+        # 2. Iterate through the tensor by row (y) and column (x)
+        for y in range(height):
+            for x in range(width):
+                # 3. Read the Float32 color components using 3D indexing [y, x, channel]
+                var r = buffer_tensor[y, x, 0]
+                var g = buffer_tensor[y, x, 1]
+                var b = buffer_tensor[y, x, 2]
+
+                # 4. Convert float [0.0, 1.0] to integer [0, 255]
+                var ri = Int(255 * r); var gi = Int(255 * g); var bi = Int(255 * b)
+
+                # 5. Write the RGB tuple string
+                var rgb = String(ri) + " " + String(gi) + " " + String(bi) + " "
+                f.write(rgb)
+        f.write("\n")
+
 def main():
+    print(num_logical_cores(), "cores")
 
     var sphere = Sphere(Vec3(0, -0.25, 3), 1.5, Color(1, 0, 0))
     var camera = Vec3(0, 0, -2)
     var light_pos = Vec3(5, 5, -10)
+
+    var storage = InlineArray[Float32, elements_in](uninitialized=True)
+    var my_tensor = xyzTensor(storage)
+    render_cpu_tensor(sphere, camera, light_pos, my_tensor)
+    write_ppm_tensor("cpu_parallel.ppm", my_tensor)
 
     var cpu_buffer = render_cpu(sphere, camera, light_pos)
     var gpu_buffer = render_gpu(sphere, camera, light_pos)
