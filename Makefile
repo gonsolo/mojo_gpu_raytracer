@@ -1,12 +1,12 @@
 all: view
 raytracer: raytracer.mojo
 	uv run mojo build raytracer.mojo
-cpu.ppm gpu.ppm cpu_parallel.ppm: raytracer
+cpu.ppm gpu.ppm: raytracer
 	./raytracer
 gpu.jpeg: gpu.ppm
 	magick gpu.ppm gpu.jpeg
-view: cpu.ppm gpu.ppm cpu_parallel.ppm
-	gimp cpu.ppm gpu.ppm cpu_parallel.ppm
+view: cpu.ppm gpu.ppm
+	gimp cpu.ppm gpu.ppm
 e edit:
 	uv run vim raytracer.mojo
 clean:

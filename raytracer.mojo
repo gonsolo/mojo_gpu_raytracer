@@ -17,8 +17,8 @@ alias channels = 3
 alias elements_in = blocks * threads * channels
 alias layout = Layout.row_major(blocks, threads, channels)
 alias xyzTensor = LayoutTensor[dtype, layout, MutAnyOrigin]
+alias readOnlyTensor = LayoutTensor[dtype, layout]
 
-# The memory is allocated on the heap and is ready for use.
 @fieldwise_init
 struct Color(ImplicitlyCopyable, Movable):
     var r: Float32
@@ -202,16 +202,7 @@ def render_cpu_tensor(
 
     parallelize[worker](num_pixels, num_workers)
 
-def render_cpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
-
-    buffer = List[Color]()
-    for y in range(height):
-        for x in range(width):
-            hit_color = get_hitcolor_cpu(x, y, sphere, camera, light_pos)
-            buffer.append(hit_color^)
-    return buffer^
-
-def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
+def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> DeviceBuffer[dtype]:
 
     var start_time = monotonic()
     var ctx = DeviceContext()
@@ -236,60 +227,36 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> List[Color]:
     var ppm_time = monotonic()
     print("Time before ppm: ", nano_to_milliseconds(ppm_time - enqueue_time), "ms")
 
-    buffer = List[Color]()
-    with hit_buffer.map_to_host() as host_buffer:
-        for y in range(height):
-            for x in range(width):
-                var hit_color = get_hitcolor_gpu(x, y, host_buffer)
-                buffer.append(hit_color^)
-    var end_time = monotonic()
-    print("Time before end: ", nano_to_milliseconds(end_time - ppm_time), "ms")
-    return buffer^
+    return hit_buffer^
 
-def write_ppm(name: String, buffer: List[Color]):
-    with open(name, "w") as f:
-        f.write("P3\n")
-        f.write(String(width))
-        f.write(" ")
-        f.write(String(height))
-        f.write("\n255\n")
-        for y in range(height):
-            for x in range(width):
-                var index = y*width + x
-                var hit_color = buffer[index].copy()
-                var ri = Int(255 * hit_color.r)
-                var gi = Int(255 * hit_color.g)
-                var bi = Int(255 * hit_color.b)
-                var rgb = String(ri) + " " + String(gi) + " " + String(bi) + " "
-                f.write(rgb)
-        f.write("\n")
-
-def write_ppm_tensor(name: String, buffer_tensor: xyzTensor):
+def write_ppm_tensor(name: String, buffer_tensor: readOnlyTensor):
     """
     Writes the content of a 3D LayoutTensor (width x height x channels)
     to a PPM image file (P3 format).
     """
     with open(name, "w") as f:
-        # 1. Write the PPM header
         f.write("P3\n")
         f.write(String(width)); f.write(" "); f.write(String(height))
         f.write("\n255\n") # Max color value
 
-        # 2. Iterate through the tensor by row (y) and column (x)
         for y in range(height):
             for x in range(width):
-                # 3. Read the Float32 color components using 3D indexing [y, x, channel]
                 var r = buffer_tensor[y, x, 0]
                 var g = buffer_tensor[y, x, 1]
                 var b = buffer_tensor[y, x, 2]
-
-                # 4. Convert float [0.0, 1.0] to integer [0, 255]
                 var ri = Int(255 * r); var gi = Int(255 * g); var bi = Int(255 * b)
-
-                # 5. Write the RGB tuple string
                 var rgb = String(ri) + " " + String(gi) + " " + String(bi) + " "
                 f.write(rgb)
         f.write("\n")
+
+def write_ppm_tensor_gpu(name: String, hit_buffer: DeviceBuffer[dtype]):
+    """
+    Maps the GPU buffer to the host and writes it to a PPM file using a LayoutTensor wrapper.
+    """
+    with hit_buffer.map_to_host() as host_buffer:
+        # Create a LayoutTensor wrapper around the HostBuffer.
+        var hit_tensor = LayoutTensor[dtype, layout](host_buffer)
+        write_ppm_tensor(name, hit_tensor)
 
 def main():
     print(num_logical_cores(), "cores")
@@ -301,13 +268,10 @@ def main():
     var storage = InlineArray[Float32, elements_in](uninitialized=True)
     var my_tensor = xyzTensor(storage)
     render_cpu_tensor(sphere, camera, light_pos, my_tensor)
-    write_ppm_tensor("cpu_parallel.ppm", my_tensor)
+    write_ppm_tensor("cpu.ppm", my_tensor)
 
-    var cpu_buffer = render_cpu(sphere, camera, light_pos)
-    var gpu_buffer = render_gpu(sphere, camera, light_pos)
-
+    var gpu_device_buffer = render_gpu(sphere, camera, light_pos)
     var pre_ppm_time = monotonic()
-    write_ppm("cpu.ppm", cpu_buffer)
-    write_ppm("gpu.ppm", gpu_buffer)
+    write_ppm_tensor_gpu("gpu.ppm", gpu_device_buffer)
     var post_ppm_time = monotonic()
     print("Time to write ppm: ", nano_to_milliseconds(post_ppm_time - pre_ppm_time), "ms")
