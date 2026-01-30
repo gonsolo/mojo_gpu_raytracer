@@ -21,7 +21,7 @@ comptime readOnlyTensor = LayoutTensor[dtype, layout]
 
 
 @fieldwise_init
-struct Color(ImplicitlyCopyable, Movable):
+struct Color(ImplicitlyCopyable, ImplicitlyDestructible, Movable):
     var r: Float32
     var g: Float32
     var b: Float32
@@ -31,7 +31,13 @@ struct Color(ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-struct Vec3(DevicePassable, ImplicitlyCopyable, Movable, Writable):
+struct Vec3(
+    DevicePassable,
+    ImplicitlyCopyable,
+    ImplicitlyDestructible,
+    Movable,
+    Writable,
+):
     var x: Float32
     var y: Float32
     var z: Float32
@@ -82,7 +88,9 @@ struct Vec3(DevicePassable, ImplicitlyCopyable, Movable, Writable):
 
 
 @fieldwise_init
-struct Sphere(DevicePassable, ImplicitlyCopyable, Movable):
+struct Sphere(
+    DevicePassable, ImplicitlyCopyable, ImplicitlyDestructible, Movable
+):
     var center: Vec3
     var radius: Float32
     var color: Color
