@@ -5,6 +5,7 @@ from gpu import block_idx, thread_idx
 from gpu.host import DeviceContext, DeviceBuffer, HostBuffer
 from layout import Layout, LayoutTensor
 from math import sqrt
+from reflection import get_type_name
 from time.time import monotonic
 from sys.info import num_logical_cores
 
@@ -48,18 +49,11 @@ struct Vec3(
 
     @staticmethod
     fn get_type_name() -> String:
-        return String("Vec3")
+        return get_type_name[Self]()
 
     @staticmethod
     fn get_device_type_name() -> String:
-        """
-        Gets device_type's name, for use in error messages when handing
-        arguments to kernels.
-
-        Returns:
-            This type's name.
-        """
-        return Self.get_type_name()
+        return get_type_name[Self]()
 
     fn __sub__(self, other: Self) -> Self:
         return Self(self.x - other.x, self.y - other.y, self.z - other.z)
@@ -98,11 +92,11 @@ struct Sphere(
 
     @staticmethod
     fn get_type_name() -> String:
-        return String("Sphere")
+        return get_type_name[Self]()
 
     @staticmethod
     fn get_device_type_name() -> String:
-        return Self.get_type_name()
+        return get_type_name[Self]()
 
     fn intersect(self, ray_origin: Vec3, ray_dir: Vec3) -> Optional[Float32]:
         oc = ray_origin - self.center
