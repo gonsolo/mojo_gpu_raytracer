@@ -117,22 +117,25 @@ fn nano_to_milliseconds(nanoseconds: UInt) -> UInt:
     return nanoseconds // 1000000
 
 
+@always_inline
 fn compute_direction(x: Int, y: Int) -> Vec3:
     px = Float32(x - width / 2) / width
     py = Float32(-(y - height / 2) / height)
     return (Vec3(px, py, 1)).normalize()
 
 
+@always_inline
 fn trace(
     direction: Vec3, sphere: Sphere, camera: Vec3, light_pos: Vec3
 ) -> Color:
     var hit_color = Color(0, 0, 0)
     t = sphere.intersect(camera, direction)
     if t:
-        hit_point = camera + direction * t.value()
-        normal = (hit_point - sphere.center).normalize()
-        light_dir = (light_pos - hit_point).normalize()
-        brightness = normal.dot(light_dir)
+        var hit_point = camera + direction * t.value()
+        var normal = (hit_point - sphere.center).normalize()
+        var light_dir = (light_pos - hit_point).normalize()
+        var dot_product = normal.dot(light_dir)
+        var brightness = dot_product if dot_product > 0 else 0.0
         hit_color = Color(
             brightness * sphere.color.r,
             brightness * sphere.color.g,
