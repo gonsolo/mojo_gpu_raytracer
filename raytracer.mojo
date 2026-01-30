@@ -282,15 +282,18 @@ def main():
     var camera = Vec3(0, 0, -2)
     var light_pos = Vec3(5, 5, -10)
 
-    var storage = InlineArray[Float32, elements_in](uninitialized=True)
-    var my_tensor = xyzTensor(storage)
-    render_cpu_tensor(sphere, camera, light_pos, my_tensor)
-    write_ppm_tensor("cpu.ppm", my_tensor)
+    var ctx = DeviceContext()
+    var cpu_device_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
+    with cpu_device_buffer.map_to_host() as host_buffer:
+        var my_tensor = xyzTensor(host_buffer)
+        render_cpu_tensor(sphere, camera, light_pos, my_tensor)
+        write_ppm_tensor("cpu.ppm", my_tensor)
 
     var gpu_device_buffer = render_gpu(sphere, camera, light_pos)
     var pre_ppm_time = monotonic()
     write_ppm_tensor_gpu("gpu.ppm", gpu_device_buffer)
     var post_ppm_time = monotonic()
+
     print(
         "Time to write ppm: ",
         nano_to_milliseconds(post_ppm_time - pre_ppm_time),
