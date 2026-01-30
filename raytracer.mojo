@@ -19,6 +19,7 @@ comptime layout = Layout.row_major(blocks, threads, channels)
 comptime xyzTensor = LayoutTensor[dtype, layout, MutAnyOrigin]
 comptime readOnlyTensor = LayoutTensor[dtype, layout]
 
+
 @fieldwise_init
 struct Color(ImplicitlyCopyable, Movable):
     var r: Float32
@@ -28,6 +29,7 @@ struct Color(ImplicitlyCopyable, Movable):
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("Color: ", self.r, ", ", self.g, ", ", self.b)
 
+
 @fieldwise_init
 struct Vec3(DevicePassable, ImplicitlyCopyable, Movable, Writable):
     var x: Float32
@@ -36,7 +38,9 @@ struct Vec3(DevicePassable, ImplicitlyCopyable, Movable, Writable):
 
     comptime device_type: AnyType = Self
 
-    fn _to_device_type[origin: MutOrigin](self, target: UnsafePointer[NoneType, origin]):
+    fn _to_device_type[
+        origin: MutOrigin
+    ](self, target: UnsafePointer[NoneType, origin]):
         target.bitcast[Self.device_type]()[] = self
 
     @staticmethod
@@ -61,20 +65,21 @@ struct Vec3(DevicePassable, ImplicitlyCopyable, Movable, Writable):
         return Self(self.x - other.x, self.y - other.y, self.z - other.z)
 
     fn __add__(self, other: Self) -> Self:
-        return Self(self.x+other.x, self.y+other.y, self.z+other.z)
+        return Self(self.x + other.x, self.y + other.y, self.z + other.z)
 
     fn __mul__(self: Self, s: Float32) -> Self:
-        return Self(self.x*s, self.y*s, self.z*s)
+        return Self(self.x * s, self.y * s, self.z * s)
 
     fn dot(self, other: Self) -> Float32:
-        return self.x*other.x + self.y*other.y + self.z*other.z
+        return self.x * other.x + self.y * other.y + self.z * other.z
 
     fn normalize(self) -> Self:
         length = sqrt(self.dot(self))
         if length > 0.01:
-            return self * (1/length)
+            return self * (1 / length)
         else:
             return self.copy()
+
 
 @fieldwise_init
 struct Sphere(DevicePassable, ImplicitlyCopyable, Movable):
@@ -84,7 +89,9 @@ struct Sphere(DevicePassable, ImplicitlyCopyable, Movable):
 
     comptime device_type: AnyType = Self
 
-    fn _to_device_type[origin: MutOrigin](self, target: UnsafePointer[NoneType, origin]):
+    fn _to_device_type[
+        origin: MutOrigin
+    ](self, target: UnsafePointer[NoneType, origin]):
         target.bitcast[Self.device_type]()[] = self
 
     @staticmethod
@@ -99,8 +106,8 @@ struct Sphere(DevicePassable, ImplicitlyCopyable, Movable):
         oc = ray_origin - self.center
         a = ray_dir.dot(ray_dir)
         b = 2 * oc.dot(ray_dir)
-        c = oc.dot(oc) - self.radius ** 2
-        discriminant = b ** 2 - 4 * a * c
+        c = oc.dot(oc) - self.radius**2
+        discriminant = b**2 - 4 * a * c
         if discriminant < 0:
             return None
         t = (-b - sqrt(discriminant)) / (2 * a)
@@ -109,19 +116,19 @@ struct Sphere(DevicePassable, ImplicitlyCopyable, Movable):
         else:
             return None
 
+
 fn nano_to_milliseconds(nanoseconds: UInt) -> UInt:
     return nanoseconds // 1000000
+
 
 fn compute_direction(x: Int, y: Int) -> Vec3:
     px = Float32(x - width / 2) / width
     py = Float32(-(y - height / 2) / height)
     return (Vec3(px, py, 1)).normalize()
 
+
 fn trace(
-    direction: Vec3,
-    sphere: Sphere,
-    camera: Vec3,
-    light_pos: Vec3
+    direction: Vec3, sphere: Sphere, camera: Vec3, light_pos: Vec3
 ) -> Color:
     var hit_color = Color(0, 0, 0)
     t = sphere.intersect(camera, direction)
@@ -133,8 +140,10 @@ fn trace(
         hit_color = Color(
             brightness * sphere.color.r,
             brightness * sphere.color.g,
-            brightness * sphere.color.b)
+            brightness * sphere.color.b,
+        )
     return hit_color^
+
 
 fn trace_gpu(
     sphere: Sphere,
@@ -151,39 +160,35 @@ fn trace_gpu(
     hit_tensor[y, x, 1][0] = hit_color.g
     hit_tensor[y, x, 2][0] = hit_color.b
 
-fn trace_pixel(x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3) -> Color:
 
+fn trace_pixel(
+    x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3
+) -> Color:
     var direction = compute_direction(x, y)
     var hit_color = trace(direction, sphere, camera, light_pos)
     return hit_color^
 
-def get_hitcolor_cpu(
-    x: Int,
-    y: Int,
-    sphere: Sphere,
-    camera: Vec3,
-    light_pos: Vec3
-) -> Color:
 
+def get_hitcolor_cpu(
+    x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3
+) -> Color:
     return trace_pixel(x, y, sphere, camera, light_pos)
+
 
 fn get_hitcolor_gpu(
     x: Int,
     y: Int,
     buffer: HostBuffer[dtype],
 ) -> Color:
-
-    var index = (y*width + x) * channels
-    r = buffer[index+0]
-    g = buffer[index+1]
-    b = buffer[index+2]
+    var index = (y * width + x) * channels
+    r = buffer[index + 0]
+    g = buffer[index + 1]
+    b = buffer[index + 2]
     return Color(r, g, b)
 
+
 def render_cpu_tensor(
-    sphere: Sphere,
-    camera: Vec3,
-    light_pos: Vec3,
-    output_tensor: xyzTensor
+    sphere: Sphere, camera: Vec3, light_pos: Vec3, output_tensor: xyzTensor
 ):
     @parameter
     fn worker(idx: Int):
@@ -202,21 +207,28 @@ def render_cpu_tensor(
 
     parallelize[worker](num_pixels, num_workers)
 
-def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> DeviceBuffer[dtype]:
 
+def render_gpu(
+    sphere: Sphere, camera: Vec3, light_pos: Vec3
+) -> DeviceBuffer[dtype]:
     var start_time = monotonic()
     var ctx = DeviceContext()
     var create_time = monotonic()
-    print("Time before create: ", nano_to_milliseconds(create_time - start_time), "ms")
+    print(
+        "Time before create: ",
+        nano_to_milliseconds(create_time - start_time),
+        "ms",
+    )
     var hit_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
     var hit_tensor = LayoutTensor[dtype, layout](hit_buffer)
     var enqueue_time = monotonic()
-    print("Time before enqueue: ", nano_to_milliseconds(enqueue_time - create_time), "ms")
+    print(
+        "Time before enqueue: ",
+        nano_to_milliseconds(enqueue_time - create_time),
+        "ms",
+    )
 
-    ctx.enqueue_function[
-        trace_gpu,
-        trace_gpu
-    ](
+    ctx.enqueue_function[trace_gpu, trace_gpu](
         sphere,
         camera,
         light_pos,
@@ -225,9 +237,12 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> DeviceBuffer[dt
         block_dim=threads,
     )
     var ppm_time = monotonic()
-    print("Time before ppm: ", nano_to_milliseconds(ppm_time - enqueue_time), "ms")
+    print(
+        "Time before ppm: ", nano_to_milliseconds(ppm_time - enqueue_time), "ms"
+    )
 
     return hit_buffer^
+
 
 def write_ppm_tensor(name: String, buffer_tensor: readOnlyTensor):
     """
@@ -236,18 +251,23 @@ def write_ppm_tensor(name: String, buffer_tensor: readOnlyTensor):
     """
     with open(name, "w") as f:
         f.write("P3\n")
-        f.write(String(width)); f.write(" "); f.write(String(height))
-        f.write("\n255\n") # Max color value
+        f.write(String(width))
+        f.write(" ")
+        f.write(String(height))
+        f.write("\n255\n")  # Max color value
 
         for y in range(height):
             for x in range(width):
                 var r = buffer_tensor[y, x, 0]
                 var g = buffer_tensor[y, x, 1]
                 var b = buffer_tensor[y, x, 2]
-                var ri = Int(255 * r); var gi = Int(255 * g); var bi = Int(255 * b)
+                var ri = Int(255 * r)
+                var gi = Int(255 * g)
+                var bi = Int(255 * b)
                 var rgb = String(ri) + " " + String(gi) + " " + String(bi) + " "
                 f.write(rgb)
         f.write("\n")
+
 
 def write_ppm_tensor_gpu(name: String, hit_buffer: DeviceBuffer[dtype]):
     """
@@ -257,6 +277,7 @@ def write_ppm_tensor_gpu(name: String, hit_buffer: DeviceBuffer[dtype]):
         # Create a LayoutTensor wrapper around the HostBuffer.
         var hit_tensor = LayoutTensor[dtype, layout](host_buffer)
         write_ppm_tensor(name, hit_tensor)
+
 
 def main():
     print(num_logical_cores(), "cores")
@@ -274,4 +295,8 @@ def main():
     var pre_ppm_time = monotonic()
     write_ppm_tensor_gpu("gpu.ppm", gpu_device_buffer)
     var post_ppm_time = monotonic()
-    print("Time to write ppm: ", nano_to_milliseconds(post_ppm_time - pre_ppm_time), "ms")
+    print(
+        "Time to write ppm: ",
+        nano_to_milliseconds(post_ppm_time - pre_ppm_time),
+        "ms",
+    )

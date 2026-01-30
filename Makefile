@@ -7,8 +7,10 @@ gpu.jpeg: gpu.ppm
 	magick gpu.ppm gpu.jpeg
 view: cpu.ppm gpu.ppm
 	gimp cpu.ppm gpu.ppm
-e edit:
+edit:
 	uv run vim raytracer.mojo
 clean:
 	git clean -dfx
-.PHONY: all e edit view
+format:
+	uv run mojo format raytracer.mojo
+.PHONY: all clean edit format view
