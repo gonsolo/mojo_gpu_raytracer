@@ -1,5 +1,5 @@
 all: view
-raytracer: raytracer.mojo
+raytracer: raytracer.mojo pyproject.toml
 	uv run mojo build raytracer.mojo
 cpu.ppm gpu.ppm: raytracer
 	./raytracer

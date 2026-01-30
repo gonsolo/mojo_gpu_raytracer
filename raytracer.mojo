@@ -8,16 +8,16 @@ from math import sqrt
 from time.time import monotonic
 from sys.info import num_logical_cores
 
-alias width = 512
-alias height = 512
-alias dtype = DType.float32
-alias blocks = width
-alias threads = height
-alias channels = 3
-alias elements_in = blocks * threads * channels
-alias layout = Layout.row_major(blocks, threads, channels)
-alias xyzTensor = LayoutTensor[dtype, layout, MutAnyOrigin]
-alias readOnlyTensor = LayoutTensor[dtype, layout]
+comptime width = 512
+comptime height = 512
+comptime dtype = DType.float32
+comptime blocks = width
+comptime threads = height
+comptime channels = 3
+comptime elements_in = blocks * threads * channels
+comptime layout = Layout.row_major(blocks, threads, channels)
+comptime xyzTensor = LayoutTensor[dtype, layout, MutAnyOrigin]
+comptime readOnlyTensor = LayoutTensor[dtype, layout]
 
 @fieldwise_init
 struct Color(ImplicitlyCopyable, Movable):
@@ -36,7 +36,7 @@ struct Vec3(DevicePassable, ImplicitlyCopyable, Movable, Writable):
 
     comptime device_type: AnyType = Self
 
-    fn _to_device_type(self, target: LegacyOpaquePointer):
+    fn _to_device_type[origin: MutOrigin](self, target: UnsafePointer[NoneType, origin]):
         target.bitcast[Self.device_type]()[] = self
 
     @staticmethod
@@ -84,7 +84,7 @@ struct Sphere(DevicePassable, ImplicitlyCopyable, Movable):
 
     comptime device_type: AnyType = Self
 
-    fn _to_device_type(self, target: LegacyOpaquePointer):
+    fn _to_device_type[origin: MutOrigin](self, target: UnsafePointer[NoneType, origin]):
         target.bitcast[Self.device_type]()[] = self
 
     @staticmethod
@@ -213,7 +213,7 @@ def render_gpu(sphere: Sphere, camera: Vec3, light_pos: Vec3) -> DeviceBuffer[dt
     var enqueue_time = monotonic()
     print("Time before enqueue: ", nano_to_milliseconds(enqueue_time - create_time), "ms")
 
-    ctx.enqueue_function_checked[
+    ctx.enqueue_function[
         trace_gpu,
         trace_gpu
     ](
