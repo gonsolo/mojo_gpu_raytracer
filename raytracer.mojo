@@ -165,7 +165,7 @@ fn trace_pixel(
     return hit_color^
 
 
-def get_hitcolor_cpu(
+fn get_hitcolor_cpu(
     x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3
 ) -> Color:
     return trace_pixel(x, y, sphere, camera, light_pos)
@@ -183,63 +183,6 @@ fn get_hitcolor_gpu(
     return Color(r, g, b)
 
 
-def render_cpu_tensor(
-    sphere: Sphere, camera: Vec3, light_pos: Vec3, output_tensor: xyzTensor
-):
-    @parameter
-    fn worker(idx: Int):
-        try:
-            var y = idx // width
-            var x = idx % width
-            hit_color = get_hitcolor_cpu(x, y, sphere, camera, light_pos)
-            output_tensor[y, x, 0] = hit_color.r
-            output_tensor[y, x, 1] = hit_color.g
-            output_tensor[y, x, 2] = hit_color.b
-        except:
-            pass
-
-    var num_pixels = width * height
-    var num_workers = num_logical_cores()
-
-    parallelize[worker](num_pixels, num_workers)
-
-
-def render_gpu(
-    sphere: Sphere, camera: Vec3, light_pos: Vec3
-) -> DeviceBuffer[dtype]:
-    var start_time = monotonic()
-    var ctx = DeviceContext()
-    var create_time = monotonic()
-    print(
-        "Time before create: ",
-        nano_to_milliseconds(create_time - start_time),
-        "ms",
-    )
-    var hit_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
-    var hit_tensor = LayoutTensor[dtype, layout](hit_buffer)
-    var enqueue_time = monotonic()
-    print(
-        "Time before enqueue: ",
-        nano_to_milliseconds(enqueue_time - create_time),
-        "ms",
-    )
-
-    ctx.enqueue_function[trace_gpu, trace_gpu](
-        sphere,
-        camera,
-        light_pos,
-        hit_tensor,
-        grid_dim=blocks,
-        block_dim=threads,
-    )
-    var ppm_time = monotonic()
-    print(
-        "Time before ppm: ", nano_to_milliseconds(ppm_time - enqueue_time), "ms"
-    )
-
-    return hit_buffer^
-
-
 def write_ppm_tensor(name: String, buffer_tensor: readOnlyTensor):
     """
     Writes the content of a 3D LayoutTensor (width x height x channels)
@@ -250,7 +193,7 @@ def write_ppm_tensor(name: String, buffer_tensor: readOnlyTensor):
         f.write(String(width))
         f.write(" ")
         f.write(String(height))
-        f.write("\n255\n")  # Max color value
+        f.write("\n255\n")
 
         for y in range(height):
             for x in range(width):
@@ -270,32 +213,71 @@ def write_ppm_tensor_gpu(name: String, hit_buffer: DeviceBuffer[dtype]):
     Maps the GPU buffer to the host and writes it to a PPM file using a LayoutTensor wrapper.
     """
     with hit_buffer.map_to_host() as host_buffer:
-        # Create a LayoutTensor wrapper around the HostBuffer.
         var hit_tensor = LayoutTensor[dtype, layout](host_buffer)
         write_ppm_tensor(name, hit_tensor)
+
+
+fn render_cpu(
+    ctx: DeviceContext,
+    sphere: Sphere,
+    camera: Vec3,
+    light_pos: Vec3,
+) raises -> DeviceBuffer[dtype]:
+    var hit_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
+
+    with hit_buffer.map_to_host() as host_buffer:
+        var output_tensor = xyzTensor(host_buffer)
+
+        @parameter
+        fn worker(idx: Int):
+            var y = idx // width
+            var x = idx % width
+            var hit_color = get_hitcolor_cpu(x, y, sphere, camera, light_pos)
+            output_tensor[y, x, 0] = hit_color.r
+            output_tensor[y, x, 1] = hit_color.g
+            output_tensor[y, x, 2] = hit_color.b
+
+        parallelize[worker](width * height, num_logical_cores())
+
+    return hit_buffer^
+
+
+fn render_gpu(
+    ctx: DeviceContext,
+    sphere: Sphere,
+    camera: Vec3,
+    light_pos: Vec3,
+) raises -> DeviceBuffer[dtype]:
+    var hit_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
+    var hit_tensor = LayoutTensor[dtype, layout](hit_buffer)
+
+    ctx.enqueue_function[trace_gpu, trace_gpu](
+        sphere,
+        camera,
+        light_pos,
+        hit_tensor,
+        grid_dim=blocks,
+        block_dim=threads,
+    )
+
+    return hit_buffer^
 
 
 def main():
     print(num_logical_cores(), "cores")
 
-    var sphere = Sphere(Vec3(0, -0.25, 3), 1.5, Color(1, 0, 0))
-    var camera = Vec3(0, 0, -2)
-    var light_pos = Vec3(5, 5, -10)
+    try:
+        var ctx = DeviceContext()
 
-    var ctx = DeviceContext()
-    var cpu_device_buffer = ctx.enqueue_create_buffer[dtype](elements_in)
-    with cpu_device_buffer.map_to_host() as host_buffer:
-        var my_tensor = xyzTensor(host_buffer)
-        render_cpu_tensor(sphere, camera, light_pos, my_tensor)
-        write_ppm_tensor("cpu.ppm", my_tensor)
+        var sphere = Sphere(Vec3(0, -0.25, 3), 1.5, Color(1, 0, 0))
+        var camera = Vec3(0, 0, -2)
+        var light_pos = Vec3(5, 5, -10)
 
-    var gpu_device_buffer = render_gpu(sphere, camera, light_pos)
-    var pre_ppm_time = monotonic()
-    write_ppm_tensor_gpu("gpu.ppm", gpu_device_buffer)
-    var post_ppm_time = monotonic()
+        var cpu_buffer = render_cpu(ctx, sphere, camera, light_pos)
+        write_ppm_tensor_gpu("cpu.ppm", cpu_buffer)
 
-    print(
-        "Time to write ppm: ",
-        nano_to_milliseconds(post_ppm_time - pre_ppm_time),
-        "ms",
-    )
+        var gpu_buffer = render_gpu(ctx, sphere, camera, light_pos)
+        write_ppm_tensor_gpu("gpu.ppm", gpu_buffer)
+
+    except e:
+        print("An error occurred during rendering:", e)
