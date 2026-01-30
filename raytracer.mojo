@@ -21,13 +21,10 @@ comptime readOnlyTensor = LayoutTensor[dtype, layout]
 
 
 @fieldwise_init
-struct Color(ImplicitlyCopyable, ImplicitlyDestructible, Movable):
+struct Color(ImplicitlyCopyable, ImplicitlyDestructible, Movable, Writable):
     var r: Float32
     var g: Float32
     var b: Float32
-
-    fn write_to[W: Writer](self, mut writer: W):
-        writer.write("Color: ", self.r, ", ", self.g, ", ", self.b)
 
 
 @fieldwise_init
@@ -63,9 +60,6 @@ struct Vec3(
             This type's name.
         """
         return Self.get_type_name()
-
-    fn write_to[W: Writer](self, mut writer: W):
-        writer.write("Vec3: ", self.x, ", ", self.y, ", ", self.z)
 
     fn __sub__(self, other: Self) -> Self:
         return Self(self.x - other.x, self.y - other.y, self.z - other.z)
