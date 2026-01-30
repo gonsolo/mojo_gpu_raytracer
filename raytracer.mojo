@@ -165,12 +165,6 @@ fn trace_pixel(
     return hit_color^
 
 
-fn get_hitcolor_cpu(
-    x: Int, y: Int, sphere: Sphere, camera: Vec3, light_pos: Vec3
-) -> Color:
-    return trace_pixel(x, y, sphere, camera, light_pos)
-
-
 fn get_hitcolor_gpu(
     x: Int,
     y: Int,
@@ -183,35 +177,20 @@ fn get_hitcolor_gpu(
     return Color(r, g, b)
 
 
-def write_ppm_tensor(name: String, buffer_tensor: readOnlyTensor):
-    """
-    Writes the content of a 3D LayoutTensor (width x height x channels)
-    to a PPM image file (P3 format).
-    """
+fn write_ppm_tensor(name: String, buffer_tensor: readOnlyTensor) raises:
     with open(name, "w") as f:
-        f.write("P3\n")
-        f.write(String(width))
-        f.write(" ")
-        f.write(String(height))
-        f.write("\n255\n")
+        f.write("P3\n", width, " ", height, "\n255\n")
 
         for y in range(height):
             for x in range(width):
                 var r = buffer_tensor[y, x, 0]
                 var g = buffer_tensor[y, x, 1]
                 var b = buffer_tensor[y, x, 2]
-                var ri = Int(255 * r)
-                var gi = Int(255 * g)
-                var bi = Int(255 * b)
-                var rgb = String(ri) + " " + String(gi) + " " + String(bi) + " "
-                f.write(rgb)
-        f.write("\n")
+                f.write(Int(255 * r), " ", Int(255 * g), " ", Int(255 * b), " ")
+            f.write("\n")
 
 
-def write_ppm_tensor_gpu(name: String, hit_buffer: DeviceBuffer[dtype]):
-    """
-    Maps the GPU buffer to the host and writes it to a PPM file using a LayoutTensor wrapper.
-    """
+fn write_ppm_tensor_gpu(name: String, hit_buffer: DeviceBuffer[dtype]) raises:
     with hit_buffer.map_to_host() as host_buffer:
         var hit_tensor = LayoutTensor[dtype, layout](host_buffer)
         write_ppm_tensor(name, hit_tensor)
@@ -232,7 +211,7 @@ fn render_cpu(
         fn worker(idx: Int):
             var y = idx // width
             var x = idx % width
-            var hit_color = get_hitcolor_cpu(x, y, sphere, camera, light_pos)
+            var hit_color = trace_pixel(x, y, sphere, camera, light_pos)
             output_tensor[y, x, 0] = hit_color.r
             output_tensor[y, x, 1] = hit_color.g
             output_tensor[y, x, 2] = hit_color.b
