@@ -152,9 +152,9 @@ fn trace_gpu(
     var direction = compute_direction(x, y)
     var hit_color = trace(direction, sphere, camera, light_pos)
 
-    hit_tensor[y, x, 0][0] = hit_color.r
-    hit_tensor[y, x, 1][0] = hit_color.g
-    hit_tensor[y, x, 2][0] = hit_color.b
+    hit_tensor[y, x, 0] = hit_color.r
+    hit_tensor[y, x, 1] = hit_color.g
+    hit_tensor[y, x, 2] = hit_color.b
 
 
 fn trace_pixel(
