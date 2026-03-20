@@ -1,21 +1,21 @@
-from algorithm import parallelize, vectorize
-from builtin.device_passable import DevicePassable
-from gpu import block_idx, thread_idx
-from gpu.host import DeviceContext, DeviceBuffer
+from std.algorithm import parallelize, vectorize
+from std.builtin.device_passable import DevicePassable
+from std.gpu import block_idx, thread_idx
+from std.gpu.host import DeviceContext, DeviceBuffer
 from layout import Layout, LayoutTensor
-from math import sqrt, iota
-from memory import UnsafePointer
-from reflection import get_type_name
-from time.time import monotonic
-from sys.info import num_logical_cores
-import sys
+from std.math import sqrt, iota
+from std.memory import UnsafePointer
+from std.reflection import get_type_name
+from std.time.time import monotonic
+from std.sys.info import num_logical_cores
+import std.sys
 
 # --- CONFIGURATION ---
 comptime width = 1920
 comptime height = 1080
 comptime dtype = DType.float32
 comptime channels = 3
-comptime simd_width = sys.info.simd_width_of[dtype]()
+comptime simd_width = std.sys.info.simd_width_of[dtype]()
 
 comptime layout = Layout.row_major(width, height, channels)
 comptime xyzTensor = LayoutTensor[dtype, layout, MutAnyOrigin]
@@ -231,7 +231,7 @@ fn render_cpu(
             for x in range(0, width, simd_width):
                 # 1. FORCE FLOAT SIMD: Ensure x_vec is float32 immediately
                 # iota returns integers by default if dtype isn't float32
-                var x_vec = iota[dtype, simd_width](x)
+                var x_vec = iota[dtype, simd_width](Scalar[dtype](x))
 
                 # 2. BROADCAST SCALARS: Convert py to a full SIMD vector
                 var px = (x_vec / f_w - 0.5) * (f_w / f_h)
